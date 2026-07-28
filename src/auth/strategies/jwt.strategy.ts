@@ -16,12 +16,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     async validate(payload: JwtUser) {
-        const user = this.usersService.findById(payload.sub);
+        const user = await this.usersService.findById(payload.sub);
 
         if(!user) {
-            return new UnauthorizedException('User not found!');
+            throw new UnauthorizedException('User not found!');
         }
 
-        return true;
+        return user;
     }
 }
