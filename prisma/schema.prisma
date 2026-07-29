@@ -24,11 +24,29 @@ model Organization {
 
 model User {
   id        String   @id @default(uuid())
-
   email     String   @unique
   password  String
-
+  sessions  UserSession[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   deletedAt DateTime?
+}
+
+model UserSession {
+  id                  String   @id @default(cuid())
+  jti                 String @unique
+  hashedRefreshToken  String
+  userId              String
+  user                User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userAgent           String?
+  ipAddress           String?
+  rememberMe          Boolean @default(false)
+  expiresAt           DateTime
+  revokedAt           DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([revokedAt])
 }

@@ -5,6 +5,9 @@ import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
+import { RefreshJwtGuard } from './guards/refresh-jwt.guard';
+import type { RefreshTokenPayload } from './interfaces/refresh-token-payload.interface';
+import { CurrentToken } from './decorators/current-token.decorator';
 
 @Controller('auth')
 export class AuthController {
@@ -25,5 +28,12 @@ export class AuthController {
     @Get('profile')
     profile(@CurrentUser() user: any) {
         return user;
+    }
+
+    @Public()
+    @UseGuards(RefreshJwtGuard)
+    @Post('refresh')
+    refresh(@CurrentUser() payload: RefreshTokenPayload, @CurrentToken() refreshToken: string) {
+        return this.authService.refresh(payload, refreshToken);
     }
 }
