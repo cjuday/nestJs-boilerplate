@@ -6,52 +6,63 @@ import { UpdateRefreshTokenParams } from './interfaces/update-refresh-token-para
 
 @Injectable()
 export class SessionsService {
-    constructor(private readonly prisma: PrismaService) {}
-    
-    async create(params: CreateSessionParams) {
-        const hashedRefreshToken = await bcrypt.hash(params.refreshToken, 10);
+  constructor(private readonly prisma: PrismaService) {}
 
-        return this.prisma.userSession.create({
-            data: {
-                userId: params.userId,
-                jti: params.jti,
-                hashedRefreshToken,
-                expiresAt: params.expiresAt,
-                rememberMe: params.rememberMe ?? false,
-                userAgent: params.userAgent,
-                ipAddress: params.ipAddress
-            },
-        });
-    }
+  async create(params: CreateSessionParams) {
+    const hashedRefreshToken = await bcrypt.hash(params.refreshToken, 10);
 
-    findByJti(jti: string) {
-        return this.prisma.userSession.findUnique({ where: { jti } });
-    }
+    return this.prisma.userSession.create({
+      data: {
+        userId: params.userId,
+        jti: params.jti,
+        hashedRefreshToken,
+        expiresAt: params.expiresAt,
+        rememberMe: params.rememberMe ?? false,
+        userAgent: params.userAgent,
+        ipAddress: params.ipAddress,
+      },
+    });
+  }
 
-    async updateRefreshToken(params: UpdateRefreshTokenParams) {
-        const hashedRefreshToken = await bcrypt.hash(params.refreshToken, 10);
+  findByJti(jti: string) {
+    return this.prisma.userSession.findUnique({ where: { jti } });
+  }
 
-        return this.prisma.userSession.update({
-            where: {
-                id: params.sessionId
-            },
-            data: {
-                jti: params.jti,
-                hashedRefreshToken,
-                expiresAt: params.expiresAt
-            }
-        })
-    }
+  async updateRefreshToken(params: UpdateRefreshTokenParams) {
+    const hashedRefreshToken = await bcrypt.hash(params.refreshToken, 10);
 
-    revokeAllForUser(userId: string) {
-        return this.prisma.userSession.updateMany({
-            where: {
-                userId,
-                revokedAt: null,
-            },
-            data: {
-                revokedAt: new Date()
-            }
-        });
-    }
+    return this.prisma.userSession.update({
+      where: {
+        id: params.sessionId,
+      },
+      data: {
+        jti: params.jti,
+        hashedRefreshToken,
+        expiresAt: params.expiresAt,
+      },
+    });
+  }
+
+  async revokeAllForUser(userId: string): Promise<void> {
+    await this.prisma.userSession.updateMany({
+      where: {
+        userId,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: new Date(),
+      },
+    });
+  }
+
+  async revoke(sessionId: string): Promise<void> {
+    await this.prisma.userSession.update({
+      where: {
+        id: sessionId,
+      },
+      data: {
+        revokedAt: new Date(),
+      },
+    });
+  }
 }

@@ -5,22 +5,6 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
-model Organization {
-  id        String   @id @default(uuid())
-  name      String
-  slug      String   @unique
-  email     String?  @unique
-  phone     String?
-
-  currency  String   @default("USD")
-  timezone  String   @default("UTC")
-
-  isActive  Boolean  @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  deletedAt DateTime?
-}
 
 model User {
   id        String   @id @default(uuid())

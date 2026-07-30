@@ -1,6 +1,6 @@
 export interface UpdateRefreshTokenParams {
-    sessionId: string;
-    refreshToken: string;
-    jti: string;
-    expiresAt: Date;
+  sessionId: string;
+  refreshToken: string;
+  jti: string;
+  expiresAt: Date;
 }

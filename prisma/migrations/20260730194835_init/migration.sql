@@ -1,14 +1,14 @@
-/*
-  Warnings:
+-- CreateTable
+CREATE TABLE "User" (
+    "id" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "password" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
 
-  - You are about to drop the column `role` on the `Organization` table. All the data in the column will be lost.
-
-*/
--- AlterTable
-ALTER TABLE "Organization" DROP COLUMN "role";
-
--- DropEnum
-DROP TYPE "PlatformRole";
+    CONSTRAINT "User_pkey" PRIMARY KEY ("id")
+);
 
 -- CreateTable
 CREATE TABLE "UserSession" (
@@ -26,6 +26,9 @@ CREATE TABLE "UserSession" (
 
     CONSTRAINT "UserSession_pkey" PRIMARY KEY ("id")
 );
+
+-- CreateIndex
+CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "UserSession_jti_key" ON "UserSession"("jti");

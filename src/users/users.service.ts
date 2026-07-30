@@ -28,21 +28,21 @@ export class UsersService {
   }
 
   findById(id: string) {
-    return this.prisma.user.findFirst({ 
-      where: { 
-        id, 
-        deletedAt: null
+    return this.prisma.user.findFirst({
+      where: {
+        id,
+        deletedAt: null,
       },
       select: {
         id: true,
         email: true,
         createdAt: true,
-        updatedAt: true
-      }
-    })
+        updatedAt: true,
+      },
+    });
   }
 
   findByEmail(email: string) {
-    return this.prisma.user.findUnique({ where: { email }});
+    return this.prisma.user.findUnique({ where: { email } });
   }
 }

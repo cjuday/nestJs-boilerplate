@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './prisma/prisma.module';
-import { OrganizationsModule } from './organizations/organizations.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { APP_GUARD } from '@nestjs/core';
@@ -14,7 +13,6 @@ import { SessionsModule } from './sessions/sessions.module';
       isGlobal: true,
     }),
     PrismaModule,
-    OrganizationsModule,
     UsersModule,
     AuthModule,
     SessionsModule,
@@ -22,8 +20,8 @@ import { SessionsModule } from './sessions/sessions.module';
   providers: [
     {
       provide: APP_GUARD,
-      useClass: JwtAuthGuard
-    }
-  ]
+      useClass: JwtAuthGuard,
+    },
+  ],
 })
 export class AppModule {}
