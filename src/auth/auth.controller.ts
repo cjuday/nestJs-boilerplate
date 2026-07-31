@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards, Res } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -8,17 +8,31 @@ import { RefreshJwtGuard } from './guards/refresh-jwt.guard';
 import type { RefreshTokenPayload } from './interfaces/refresh-token-payload.interface';
 import { CurrentToken } from './decorators/current-token.decorator';
 import type { JwtPayload } from './interfaces/jwt-payload.interface';
-import { LogoutDto } from './dto/logout.dto';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiOkResponse, ApiUnauthorizedResponse, ApiCreatedResponse, ApiConflictResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiOkResponse,
+  ApiUnauthorizedResponse,
+  ApiCreatedResponse,
+  ApiConflictResponse,
+} from '@nestjs/swagger';
 import { AuthResponseDto } from './dto/responses/auth-response.dto';
 import { RegisterResponseDto } from './dto/responses/register-response.dto';
+import type { Response } from 'express';
+import { ConfigService } from '@nestjs/config';
+import { getRefreshCookieOptions } from './auth.constants';
 
 @ApiTags('Authentication')
 @ApiBearerAuth('access-token')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService,
+  ) {}
 
+  //Register
   @ApiOperation({
     summary: 'Register a new user',
   })
@@ -35,9 +49,11 @@ export class AuthController {
     return this.authService.register(registerDto);
   }
 
+  //Login
   @ApiOperation({
     summary: 'Login',
-    description: 'Authenticate a user and return access and refresh tokens.',
+    description:
+      'Authenticate a user and return an access token. The refresh token is stored in an HTTP-only cookie.',
   })
   @ApiOkResponse({
     description: 'Login successful.',
@@ -47,18 +63,35 @@ export class AuthController {
   })
   @Public()
   @Post('login')
-  login(@Body() loginDto: LoginDto): Promise<AuthResponseDto> {
-    return this.authService.login(loginDto);
+  async login(
+    @Body() loginDto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<AuthResponseDto> {
+    const { accessToken, refreshToken } =
+      await this.authService.login(loginDto);
+    const refreshCoookieName = 'refreshToken';
+    const rememberMe = loginDto.rememberMe ?? false;
+
+    res.cookie(
+      refreshCoookieName,
+      refreshToken,
+      getRefreshCookieOptions(this.configService, rememberMe),
+    );
+
+    return { accessToken };
   }
 
+  //Get Current User
   @Get('profile')
   profile(@CurrentUser() user: JwtPayload): JwtPayload {
     return user;
   }
 
+  //Refresh Token
   @ApiOperation({
     summary: 'Refresh access token',
-    description: 'Generate a new access token and refresh token using a valid refresh token.',
+    description:
+      'Generate a new access token and refresh token using a valid refresh token.',
   })
   @ApiOkResponse({
     description: 'Tokens refreshed successfully.',
@@ -67,23 +100,55 @@ export class AuthController {
   @ApiUnauthorizedResponse({
     description: 'Invalid or expired refresh token.',
   })
+  @Post('refresh')
   @Public()
   @UseGuards(RefreshJwtGuard)
-  @Post('refresh')
-  refresh(
+  async refresh(
     @CurrentUser() payload: RefreshTokenPayload,
     @CurrentToken() refreshToken: string,
-  ) {
-    return this.authService.refresh(payload, refreshToken);
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<AuthResponseDto> {
+    const tokens = await this.authService.refresh(payload, refreshToken);
+    const refreshCoookieName = 'refreshToken';
+
+    res.cookie(
+      refreshCoookieName,
+      tokens.refreshToken,
+      getRefreshCookieOptions(this.configService, tokens.rememberMe),
+    );
+
+    return { accessToken: tokens.accessToken };
   }
 
+  //Logout
   @Post('logout')
-  logout(@CurrentUser() user: JwtPayload, @Body() dto: LogoutDto) {
-    return this.authService.logout(user, dto.refreshToken);
+  @UseGuards(RefreshJwtGuard)
+  async logout(
+    @CurrentUser() payload: RefreshTokenPayload,
+    @CurrentToken() refreshToken: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    await this.authService.logout(payload, refreshToken);
+    const refreshCoookieName = 'refreshToken';
+
+    res.clearCookie(
+      refreshCoookieName,
+      getRefreshCookieOptions(this.configService, false),
+    );
   }
 
   @Post('logout-all')
-  async logoutAll(@CurrentUser() user: JwtPayload): Promise<void> {
+  async logoutAll(
+    @CurrentUser() user: JwtPayload,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<void> {
     await this.authService.logoutAll(user);
+
+    const refreshCoookieName = 'refreshToken';
+
+    res.clearCookie(
+      refreshCoookieName,
+      getRefreshCookieOptions(this.configService, false),
+    );
   }
 }

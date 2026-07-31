@@ -3,18 +3,18 @@ import {
   ExecutionContext,
   UnauthorizedException,
 } from '@nestjs/common';
-import { Request } from 'express';
+import { RequestWithCookies } from 'src/common/types/request-with-cookies.type';
 
 export const CurrentToken = createParamDecorator(
   (_data: unknown, ctx: ExecutionContext): string => {
-    const request = ctx.switchToHttp().getRequest<Request>();
+    const request = ctx.switchToHttp().getRequest<RequestWithCookies>();
 
-    const authorization = request.headers.authorization;
+    const refreshToken = request.cookies.refreshToken;
 
-    if (!authorization?.startsWith('Bearer ')) {
-      throw new UnauthorizedException('Token not found');
+    if (!refreshToken) {
+      throw new UnauthorizedException('Refresh token not found');
     }
 
-    return authorization.substring(7);
+    return refreshToken;
   },
 );

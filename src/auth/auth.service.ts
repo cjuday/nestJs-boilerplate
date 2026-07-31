@@ -13,6 +13,7 @@ import { SessionsService } from 'src/sessions/sessions.service';
 import { RefreshTokenPayload } from './interfaces/refresh-token-payload.interface';
 import { TokenService } from './token/token.service';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
+import { RefreshAuthResult } from './interfaces/refresh-auth-result.interface';
 
 @Injectable()
 export class AuthService {
@@ -78,16 +79,17 @@ export class AuthService {
     return tokens;
   }
 
-  async logout(user: JwtPayload, refreshToken: string): Promise<void> {
-    const payload = await this.tokenService.verifyRefreshToken(refreshToken);
-
+  async logout(
+    payload: RefreshTokenPayload,
+    refreshToken: string,
+  ): Promise<void> {
     const session = await this.sessionsService.findByJti(payload.jti);
 
     if (!session) {
       throw new UnauthorizedException('Invalid refresh token!');
     }
 
-    if (session.userId !== user.sub) {
+    if (session.userId !== payload.sub) {
       throw new UnauthorizedException('Invalid session!');
     }
 
@@ -110,7 +112,7 @@ export class AuthService {
   async refresh(
     payload: RefreshTokenPayload,
     refreshToken: string,
-  ): Promise<AuthTokens> {
+  ): Promise<RefreshAuthResult> {
     const session = await this.sessionsService.findByJti(payload.jti);
 
     if (!session) {
@@ -161,7 +163,11 @@ export class AuthService {
       expiresAt,
     });
 
-    return tokens;
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      rememberMe: session.rememberMe,
+    };
   }
 
   async logoutAll(user: JwtPayload): Promise<void> {
