@@ -63,12 +63,8 @@ export class AuthController {
   })
   @Public()
   @Post('login')
-  async login(
-    @Body() loginDto: LoginDto,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<AuthResponseDto> {
-    const { accessToken, refreshToken } =
-      await this.authService.login(loginDto);
+  async login(@Body() loginDto: LoginDto, @Res({ passthrough: true }) res: Response): Promise<AuthResponseDto> {
+    const { accessToken, refreshToken } = await this.authService.login(loginDto);
     const refreshCoookieName = 'refreshToken';
     const rememberMe = loginDto.rememberMe ?? false;
 
