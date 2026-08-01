@@ -8,12 +8,12 @@ import { UsersService } from 'src/users/users.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { randomUUID } from 'crypto';
-import { AuthTokens } from './interfaces/auth-tokens.interface';
 import { SessionsService } from 'src/sessions/sessions.service';
 import { RefreshTokenPayload } from './interfaces/refresh-token-payload.interface';
 import { TokenService } from './token/token.service';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
 import { RefreshAuthResult } from './interfaces/refresh-auth-result.interface';
+import { LoginResult } from './interfaces/login-results.interface';
 
 @Injectable()
 export class AuthService {
@@ -38,7 +38,7 @@ export class AuthService {
     });
   }
 
-  async login(loginDto: LoginDto): Promise<AuthTokens> {
+  async login(loginDto: LoginDto): Promise<LoginResult> {
     const jti = randomUUID();
 
     const rememberMe = loginDto.rememberMe ?? false;
@@ -76,7 +76,15 @@ export class AuthService {
       rememberMe: rememberMe,
     });
 
-    return tokens;
+    return {
+      ...tokens,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phoneNumber: user.phoneNumber,
+      },
+    };
   }
 
   async logout(
@@ -167,6 +175,12 @@ export class AuthService {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
       rememberMe: session.rememberMe,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phoneNumber: user.phoneNumber,
+      },
     };
   }
 

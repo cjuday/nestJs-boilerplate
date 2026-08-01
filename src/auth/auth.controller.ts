@@ -63,8 +63,12 @@ export class AuthController {
   })
   @Public()
   @Post('login')
-  async login(@Body() loginDto: LoginDto, @Res({ passthrough: true }) res: Response): Promise<AuthResponseDto> {
-    const { accessToken, refreshToken } = await this.authService.login(loginDto);
+  async login(
+    @Body() loginDto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<AuthResponseDto> {
+    const { accessToken, refreshToken, user } =
+      await this.authService.login(loginDto);
     const refreshCoookieName = 'refreshToken';
     const rememberMe = loginDto.rememberMe ?? false;
 
@@ -74,7 +78,7 @@ export class AuthController {
       getRefreshCookieOptions(this.configService, rememberMe),
     );
 
-    return { accessToken };
+    return { accessToken, user };
   }
 
   //Get Current User
@@ -104,16 +108,21 @@ export class AuthController {
     @CurrentToken() refreshToken: string,
     @Res({ passthrough: true }) res: Response,
   ): Promise<AuthResponseDto> {
-    const tokens = await this.authService.refresh(payload, refreshToken);
+    const {
+      accessToken,
+      refreshToken: newRefreshToken,
+      rememberMe,
+      user,
+    } = await this.authService.refresh(payload, refreshToken);
     const refreshCoookieName = 'refreshToken';
 
     res.cookie(
       refreshCoookieName,
-      tokens.refreshToken,
-      getRefreshCookieOptions(this.configService, tokens.rememberMe),
+      newRefreshToken,
+      getRefreshCookieOptions(this.configService, rememberMe),
     );
 
-    return { accessToken: tokens.accessToken };
+    return { accessToken, user };
   }
 
   //Logout

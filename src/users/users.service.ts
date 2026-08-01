@@ -33,12 +33,6 @@ export class UsersService {
         id,
         deletedAt: null,
       },
-      select: {
-        id: true,
-        email: true,
-        createdAt: true,
-        updatedAt: true,
-      },
     });
   }
 
