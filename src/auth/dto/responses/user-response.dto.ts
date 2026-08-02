@@ -12,4 +12,14 @@ export class UserResponseDto {
 
   @ApiProperty()
   phoneNumber!: string;
+
+  @ApiProperty()
+  isEmailVerified!: boolean;
+
+  @ApiProperty({
+    nullable: true,
+    type: String,
+    format: 'date-time',
+  })
+  emailVerificationExpiresAt!: Date | null;
 }

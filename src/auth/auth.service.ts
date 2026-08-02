@@ -1,8 +1,4 @@
-import {
-  ConflictException,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { ConflictException, Injectable, UnauthorizedException, NotFoundException, BadRequestException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from 'src/users/users.service';
 import { RegisterDto } from './dto/register.dto';
@@ -14,6 +10,8 @@ import { TokenService } from './token/token.service';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
 import { RefreshAuthResult } from './interfaces/refresh-auth-result.interface';
 import { LoginResult } from './interfaces/login-results.interface';
+import { EmailVerificationService } from 'src/email-verification/email-verification.service';
+import { MailService } from 'src/mail/mail.service';
 
 @Injectable()
 export class AuthService {
@@ -21,9 +19,11 @@ export class AuthService {
     private readonly userService: UsersService,
     private readonly sessionsService: SessionsService,
     private readonly tokenService: TokenService,
+    private readonly mailService: MailService,
+    private readonly emailVerificationService: EmailVerificationService,
   ) {}
 
-  async register(registerDto: RegisterDto) {
+  async register(registerDto: RegisterDto): Promise<LoginResult> {
     const existingUser = await this.userService.findByEmail(registerDto.email);
 
     if (existingUser) {
@@ -32,10 +32,47 @@ export class AuthService {
 
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);
 
-    return this.userService.create({
-      ...registerDto,
-      password: hashedPassword,
+    const user = await this.userService.create({...registerDto, password: hashedPassword });
+
+    const verificationToken = await this.emailVerificationService.create(user.id);
+
+    await this.mailService.sendVerificationEmail(user.email, user.name, verificationToken.token);
+
+    const jti = randomUUID();
+
+    const rememberMe = false;
+
+    const refreshExpiresIn =
+      this.tokenService.getRefreshExpiresIn(rememberMe);
+
+    const tokens = await this.tokenService.generateTokens(
+      user,
+      jti,
+      refreshExpiresIn,
+    );
+
+    const expiresAt = this.tokenService.calculateExpiresAt(refreshExpiresIn);
+
+    await this.sessionsService.create({
+      userId: user.id,
+      jti,
+      refreshToken: tokens.refreshToken,
+      expiresAt,
+      rememberMe,
     });
+
+    return {
+      ...tokens,
+      rememberMe,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phoneNumber: user.phoneNumber,
+        isEmailVerified: user.isEmailVerified,
+        emailVerificationExpiresAt: verificationToken.expiresAt,
+      },
+    };
   }
 
   async login(loginDto: LoginDto): Promise<LoginResult> {
@@ -76,13 +113,18 @@ export class AuthService {
       rememberMe: rememberMe,
     });
 
+    const verification = await this.emailVerificationService.findLatestUnverified(user.id);
+
     return {
       ...tokens,
+      rememberMe,
       user: {
         id: user.id,
         name: user.name,
         email: user.email,
         phoneNumber: user.phoneNumber,
+        isEmailVerified: user.isEmailVerified,
+        emailVerificationExpiresAt: verification?.expiresAt ?? null,
       },
     };
   }
@@ -170,6 +212,8 @@ export class AuthService {
       jti: newJti,
       expiresAt,
     });
+    
+    const verification = await this.emailVerificationService.findLatestUnverified(user.id);
 
     return {
       accessToken: tokens.accessToken,
@@ -180,11 +224,29 @@ export class AuthService {
         name: user.name,
         email: user.email,
         phoneNumber: user.phoneNumber,
+        isEmailVerified: user.isEmailVerified,
+        emailVerificationExpiresAt: verification?.expiresAt ?? null,
       },
     };
   }
 
   async logoutAll(user: JwtPayload): Promise<void> {
     await this.sessionsService.revokeAllForUser(user.sub);
+  }
+
+  async resendEmailVerification(userId: string): Promise<void> {
+    const user = await this.userService.findById(userId);
+
+    if (!user) {
+      throw new NotFoundException('User not found.');
+    }
+
+    if (user.isEmailVerified) {
+      throw new BadRequestException('Email is already verified.');
+    }
+
+    const verification = await this.emailVerificationService.create(user.id);
+
+    await this.mailService.sendVerificationEmail(user.email, user.name, verification.token);
   }
 }

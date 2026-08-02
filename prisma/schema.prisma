@@ -7,15 +7,21 @@ datasource db {
 }
 
 model User {
-  id            String        @id @default(uuid())
-  name          String
-  email         String        @unique
-  phoneNumber   String        @map("phone_number")
-  password      String
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  deletedAt     DateTime?
-  sessions      UserSession[]
+  id                String        @id @default(uuid())
+  name              String
+  email             String        @unique
+  phoneNumber       String        @map("phone_number")
+  password          String
+  isEmailVerified   Boolean       @default(false) @map("is_email_verified")
+  isPhoneVerified   Boolean       @default(false) @map("is_phone_verified")
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  deletedAt         DateTime?
+  sessions          UserSession[]
+
+  emailVerification EmailVerification?
+
+  @@map("users")
 }
 
 model UserSession {
@@ -35,4 +41,19 @@ model UserSession {
   @@index([userId])
   @@index([expiresAt])
   @@index([revokedAt])
+
+  @@map("user_sessions")
+}
+
+model EmailVerification {
+  id         String   @id @default(uuid())
+  token      String   @unique
+  expiresAt  DateTime
+  verifiedAt DateTime?
+  createdAt  DateTime @default(now())
+  userId     String   @unique
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("email_verifications")
 }

@@ -6,6 +6,9 @@ import { AuthModule } from './auth/auth.module';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { SessionsModule } from './sessions/sessions.module';
+import { EmailVerificationModule } from './email-verification/email-verification.module';
+import { MailModule } from './mail/mail.module';
+import { RealtimeModule } from './realtime/realtime.module';
 
 @Module({
   imports: [
@@ -16,6 +19,9 @@ import { SessionsModule } from './sessions/sessions.module';
     UsersModule,
     AuthModule,
     SessionsModule,
+    EmailVerificationModule,
+    MailModule,
+    RealtimeModule,
   ],
   providers: [
     {

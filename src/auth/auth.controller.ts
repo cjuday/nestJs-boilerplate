@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards, Res } from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards, Res, Query } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -8,6 +8,7 @@ import { RefreshJwtGuard } from './guards/refresh-jwt.guard';
 import type { RefreshTokenPayload } from './interfaces/refresh-token-payload.interface';
 import { CurrentToken } from './decorators/current-token.decorator';
 import type { JwtPayload } from './interfaces/jwt-payload.interface';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -22,6 +23,7 @@ import { RegisterResponseDto } from './dto/responses/register-response.dto';
 import type { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { getRefreshCookieOptions } from './auth.constants';
+import { EmailVerificationService } from 'src/email-verification/email-verification.service';
 
 @ApiTags('Authentication')
 @ApiBearerAuth('access-token')
@@ -30,6 +32,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly configService: ConfigService,
+    private readonly emailVerificationService: EmailVerificationService,
   ) {}
 
   //Register
@@ -155,5 +158,22 @@ export class AuthController {
       refreshCoookieName,
       getRefreshCookieOptions(this.configService, false),
     );
+  }
+
+  @Get('verify-email')
+  @Public()
+  async verifyEmail(@Query('token') token: string): Promise<{ message: string }> {
+    await this.emailVerificationService.verifyEmail(token);
+    return { message: 'Email verified successfully.' };
+  }
+
+  @Post('resend-email-verification')
+  @UseGuards(JwtAuthGuard)
+  async resendEmailVerification(@CurrentUser() user: JwtPayload) {
+    await this.authService.resendEmailVerification(user.sub);
+
+    return {
+      message: 'Verification email sent successfully.',
+    };
   }
 }
