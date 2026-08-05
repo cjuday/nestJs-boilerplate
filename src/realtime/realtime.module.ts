@@ -14,6 +14,7 @@ import { JwtModule } from '@nestjs/jwt';
     RealtimeService,
   ],
   exports: [
+    RealtimeGateway,
     RealtimeService,
   ],
 })

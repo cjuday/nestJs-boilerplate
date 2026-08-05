@@ -28,11 +28,12 @@ export class UsersService {
   }
 
   findById(id: string) {
-    return this.prisma.user.findFirst({
-      where: {
-        id,
-        deletedAt: null,
-      },
+    if(!id) {
+        return null;
+    }
+
+    return this.prisma.user.findUnique({
+      where: { id }
     });
   }
 

@@ -12,6 +12,8 @@ import { RefreshAuthResult } from './interfaces/refresh-auth-result.interface';
 import { LoginResult } from './interfaces/login-results.interface';
 import { EmailVerificationService } from 'src/email-verification/email-verification.service';
 import { MailService } from 'src/mail/mail.service';
+import { PasswordResetService } from 'src/password-reset/password-reset.service';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()
 export class AuthService {
@@ -21,6 +23,8 @@ export class AuthService {
     private readonly tokenService: TokenService,
     private readonly mailService: MailService,
     private readonly emailVerificationService: EmailVerificationService,
+    private readonly passwordResetService: PasswordResetService,
+    private readonly prisma: PrismaService
   ) {}
 
   async register(registerDto: RegisterDto): Promise<LoginResult> {
@@ -234,7 +238,7 @@ export class AuthService {
     await this.sessionsService.revokeAllForUser(user.sub);
   }
 
-  async resendEmailVerification(userId: string): Promise<void> {
+  async resendEmailVerification(userId: string) {
     const user = await this.userService.findById(userId);
 
     if (!user) {
@@ -247,6 +251,51 @@ export class AuthService {
 
     const verification = await this.emailVerificationService.create(user.id);
 
-    await this.mailService.sendVerificationEmail(user.email, user.name, verification.token);
+    try {
+        await this.mailService.sendVerificationEmail(user.email, user.name, verification.token);
+    } catch (error) {
+        await this.emailVerificationService.delete(user.id);
+        throw error;
+    }
+
+    return verification;
+  }
+
+  async forgotPassword(email: string): Promise<void> {
+    const user = await this.userService.findByEmail(email);
+
+    if(!user) {
+      return;
+    }
+
+    const reset = await this.passwordResetService.create(user.id);
+
+    await this.mailService.sendPasswordResetEmail(user.email, user.name, reset.token);
+  }
+
+  async resetPassword(token: string, password: string) : Promise<void> {
+    const reset = await this.passwordResetService.verifyToken(token);
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({ 
+        where: {
+          id: reset.userId
+        },
+        data: {
+          password: hashedPassword
+        }
+      }),
+
+      this.prisma.passwordReset.update({
+        where: {
+          token
+        },
+        data: {
+          usedAt: new Date()
+        }
+      })
+    ]);
   }
 }

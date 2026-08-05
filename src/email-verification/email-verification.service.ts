@@ -4,10 +4,15 @@ import { randomBytes } from 'crypto';
 import { ConfigService } from '@nestjs/config';
 import ms, {type StringValue } from 'ms';
 import { BadRequestException } from '@nestjs/common/exceptions';
+import { RealtimeGateway } from 'src/realtime/realtime.gateway';
 
 @Injectable()
 export class EmailVerificationService {
-    constructor(private readonly prisma: PrismaService, private readonly configService: ConfigService) {}
+    constructor(
+        private readonly prisma: PrismaService, 
+        private readonly configService: ConfigService,
+        private readonly realtimeGateway: RealtimeGateway
+    ) {}
 
     generateToken(): string {
         return randomBytes(32).toString('hex');
@@ -63,7 +68,12 @@ export class EmailVerificationService {
             })
         ]);
 
-        
+        this.realtimeGateway.emitToUser(verification.userId, 'email_verified',
+            {
+                isEmailVerified: true,
+                emailVerificationExpiresAt: null,
+            },
+        );
     }
 
     async regenerate(userId: string) {
@@ -79,6 +89,12 @@ export class EmailVerificationService {
             orderBy: {
                 createdAt: 'desc',
             },
+        });
+    }
+
+    async delete(userId: string): Promise<void> {
+        await this.prisma.emailVerification.deleteMany({
+            where: { userId }
         });
     }
 }

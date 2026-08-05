@@ -9,6 +9,7 @@ import { SessionsModule } from './sessions/sessions.module';
 import { EmailVerificationModule } from './email-verification/email-verification.module';
 import { MailModule } from './mail/mail.module';
 import { RealtimeModule } from './realtime/realtime.module';
+import { PasswordResetModule } from './password-reset/password-reset.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { RealtimeModule } from './realtime/realtime.module';
     EmailVerificationModule,
     MailModule,
     RealtimeModule,
+    PasswordResetModule,
   ],
   providers: [
     {

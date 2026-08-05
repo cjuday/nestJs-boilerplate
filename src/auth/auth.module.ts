@@ -9,10 +9,17 @@ import { RefreshJwtStrategy } from './strategies/refresh-jwt.strategy';
 import { TokenService } from './token/token.service';
 import { MailModule } from 'src/mail/mail.module';
 import { EmailVerificationModule } from 'src/email-verification/email-verification.module';
+import { PasswordResetModule } from 'src/password-reset/password-reset.module';
 
 @Module({
-  imports: [JwtModule.register({}), UsersModule, SessionsModule, EmailVerificationModule, MailModule],
-
+  imports: [
+    JwtModule.register({}), 
+    UsersModule, 
+    SessionsModule, 
+    EmailVerificationModule, 
+    MailModule,
+    PasswordResetModule
+  ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, RefreshJwtStrategy, TokenService],
 })

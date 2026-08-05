@@ -24,6 +24,9 @@ import type { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { getRefreshCookieOptions } from './auth.constants';
 import { EmailVerificationService } from 'src/email-verification/email-verification.service';
+import { VerifyEmailDto } from './dto/verify-email.dto';
+import { ForgotPasswordDto } from 'src/password-reset/dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 @ApiTags('Authentication')
 @ApiBearerAuth('access-token')
@@ -160,20 +163,44 @@ export class AuthController {
     );
   }
 
-  @Get('verify-email')
+  @Post('verify-email')
   @Public()
-  async verifyEmail(@Query('token') token: string): Promise<{ message: string }> {
-    await this.emailVerificationService.verifyEmail(token);
+  async verifyEmail(@Body() dto: VerifyEmailDto): Promise<{ message: string }> {
+    await this.emailVerificationService.verifyEmail(dto.token);
     return { message: 'Email verified successfully.' };
   }
 
   @Post('resend-email-verification')
   @UseGuards(JwtAuthGuard)
   async resendEmailVerification(@CurrentUser() user: JwtPayload) {
-    await this.authService.resendEmailVerification(user.sub);
+     const verification = await this.authService.resendEmailVerification(user.sub);
 
     return {
       message: 'Verification email sent successfully.',
+      emailVerificationExpiresAt: verification.expiresAt,
     };
   }
+
+  @Post('forgot-password')
+  @Public()
+  async forgotPassword(@Body() dto: ForgotPasswordDto) : Promise<{message: string}> {
+    await this.authService.forgotPassword(dto.email);
+
+    return { message: "If an account exists, a password reset email has been sent."}
+  }
+
+  @Post('reset-password')
+  @Public()
+  async changePassword(@Body() dto: ResetPasswordDto) : Promise<{ message: string }> {
+    await this.authService.resetPassword(dto.token, dto.password);
+
+    return { message: 'Password reset successfully.' }
+  }
+
+  // @Patch('change-password')
+  // @UseGuards(JwtAuthGuard)
+  // async changePassword(@CurrentUser() user: JwtPayload, @Body() dto: ChangePasswordDto): Promise<{ message: string }> {
+  //   await this.authService.changePassword(user.sub, dto.currentPassword, dto.newPassword);
+  //   return { message: 'Password changed successfully.' };
+  // }
 }

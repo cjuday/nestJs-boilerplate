@@ -6,14 +6,14 @@ export class LoginDto {
     description: 'User email address',
   })
   @IsEmail()
-  email: string;
+  email!: string;
 
   @ApiProperty({
     example: 'Password@123',
     description: 'User password',
   })
   @IsString()
-  password: string;
+  password!: string;
 
   @ApiPropertyOptional({
     example: false,

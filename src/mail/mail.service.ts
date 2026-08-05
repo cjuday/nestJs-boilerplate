@@ -37,4 +37,37 @@ export class MailService {
                 `,        
         });
     }
+
+    async sendPasswordResetEmail(email: string, name: string, resetToken: string): Promise<void> {
+        const from = `${this.configService.getOrThrow('MAIL_FROM_NAME')} <${this.configService.getOrThrow('MAIL_FROM_EMAIL')}>`;
+        const appName = this.configService.getOrThrow('APP_NAME');
+        const resetUrl = `${this.configService.getOrThrow<string>('APP_FRONTEND_URL')}/auth/reset-password?token=${resetToken}`;
+
+        await this.resend.emails.send({
+            from,
+            to: email,
+            subject: `Reset Your ${appName} Password`,
+            html: `
+                <h2>Hello ${name},</h2>
+
+                <p>
+                    We received a request to reset your password.
+                </p>
+
+                <p>
+                    <a href="${resetUrl}">
+                        Reset Password
+                    </a>
+                </p>
+
+                <p>
+                    This link expires in 15 minutes.
+                </p>
+
+                <p>
+                    If you didn't request a password reset, you can safely ignore this email.
+                </p>
+            `,   
+        });
+    }
 }
