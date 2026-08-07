@@ -14,6 +14,7 @@ import { EmailVerificationService } from 'src/email-verification/email-verificat
 import { MailService } from 'src/mail/mail.service';
 import { PasswordResetService } from 'src/password-reset/password-reset.service';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 @Injectable()
 export class AuthService {
@@ -297,5 +298,36 @@ export class AuthService {
         }
       })
     ]);
+  }
+
+  async changePassword(userId: string, dto: ChangePasswordDto) {
+    const user = await this.prisma.user.findUnique({
+      where: {
+        id: userId,
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Unauthorized.');
+    }
+
+    const passwordMatches = await bcrypt.compare(dto.currentPassword, user.password);
+
+    if (!passwordMatches) {
+      throw new BadRequestException('Current password is incorrect.');
+    }
+
+    const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
+
+    await this.prisma.user.update({
+      where: {
+        id: userId,
+      },
+      data: {
+        password: hashedPassword,
+      },
+    });
+
+    return { message: 'Password changed successfully.' };
   }
 }

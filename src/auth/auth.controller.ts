@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards, Res, Query } from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards, Res, Query, Patch } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -27,6 +27,7 @@ import { EmailVerificationService } from 'src/email-verification/email-verificat
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { ForgotPasswordDto } from 'src/password-reset/dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 @ApiTags('Authentication')
 @ApiBearerAuth('access-token')
@@ -191,16 +192,14 @@ export class AuthController {
 
   @Post('reset-password')
   @Public()
-  async changePassword(@Body() dto: ResetPasswordDto) : Promise<{ message: string }> {
+  async resetPassword(@Body() dto: ResetPasswordDto) : Promise<{ message: string }> {
     await this.authService.resetPassword(dto.token, dto.password);
 
     return { message: 'Password reset successfully.' }
   }
 
-  // @Patch('change-password')
-  // @UseGuards(JwtAuthGuard)
-  // async changePassword(@CurrentUser() user: JwtPayload, @Body() dto: ChangePasswordDto): Promise<{ message: string }> {
-  //   await this.authService.changePassword(user.sub, dto.currentPassword, dto.newPassword);
-  //   return { message: 'Password changed successfully.' };
-  // }
+  @Patch('change-password')
+  async changePassword(@CurrentUser() user: JwtPayload, @Body() dto: ChangePasswordDto): Promise<{ message: string }> {
+    return this.authService.changePassword(user.sub, dto);
+  }
 }
