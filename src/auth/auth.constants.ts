@@ -15,7 +15,7 @@ export function getRefreshCookieOptions(
     sameSite:
       (configService.get<string>('COOKIE_SAME_SITE') as
         'lax' | 'strict' | 'none') ?? 'lax',
-    path: '/auth/refresh',
+    path: '/auth',
     maxAge: ms(expiresIn),
   };
 }
