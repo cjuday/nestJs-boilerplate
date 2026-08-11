@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Resend } from 'resend';
+import { verificationEmail } from '../common/mail/templates/verification-email';
+import { passwordResetEmail } from '../common/mail//templates/password-reset-email';
+import { formatDuration } from '../common/utils/formatDuration';
 
 @Injectable()
 export class MailService {
@@ -19,22 +22,7 @@ export class MailService {
             from,
             to: email,
             subject: `Verify Your ${appName} Account`,
-            html: `
-                <h2>Welcome ${name}</h2>
-                <p>Thanks for registering.</p>
-                <p>
-                    Click the button below to verify your email.
-                </p>
-                <p>
-                    <a href="${verificationUrl}">
-                    Verify Email
-                    </a>
-                </p>
-
-                <p>
-                    This link expires in 10 minutes.
-                </p>
-                `,        
+            html: verificationEmail({ name, verificationUrl })
         });
     }
 
@@ -42,32 +30,13 @@ export class MailService {
         const from = `${this.configService.getOrThrow('MAIL_FROM_NAME')} <${this.configService.getOrThrow('MAIL_FROM_EMAIL')}>`;
         const appName = this.configService.getOrThrow('APP_NAME');
         const resetUrl = `${this.configService.getOrThrow<string>('APP_FRONTEND_URL')}/auth/reset-password?token=${resetToken}`;
+        const expiresIn = formatDuration(this.configService.getOrThrow('PASSWORD_RESET_EXPIRES_IN'));
 
         await this.resend.emails.send({
             from,
             to: email,
             subject: `Reset Your ${appName} Password`,
-            html: `
-                <h2>Hello ${name},</h2>
-
-                <p>
-                    We received a request to reset your password.
-                </p>
-
-                <p>
-                    <a href="${resetUrl}">
-                        Reset Password
-                    </a>
-                </p>
-
-                <p>
-                    This link expires in 15 minutes.
-                </p>
-
-                <p>
-                    If you didn't request a password reset, you can safely ignore this email.
-                </p>
-            `,   
+            html: passwordResetEmail({ name, resetUrl, expiresIn})
         });
     }
 }
