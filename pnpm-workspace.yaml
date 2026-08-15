@@ -2,5 +2,6 @@ allowBuilds:
   '@prisma/engines': false
   '@scarf/scarf': false
   bcrypt: false
+  esbuild: false
   prisma: false
   unrs-resolver: false

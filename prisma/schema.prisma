@@ -7,22 +7,24 @@ datasource db {
 }
 
 model User {
-  id                String        @id @default(uuid())
-  name              String
-  email             String        @unique
-  phoneNumber       String        @map("phone_number")
-  password          String
-  isEmailVerified   Boolean       @default(false) @map("is_email_verified")
-  isPhoneVerified   Boolean       @default(false) @map("is_phone_verified")
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-  deletedAt         DateTime?
-  sessions          UserSession[]
-  passwordResets    PasswordReset[]
+    id                String    @id @default(uuid())
+    name              String
+    email             String    @unique
+    phoneNumber       String    @map("phone_number")
+    password          String
+    isEmailVerified   Boolean   @default(false) @map("is_email_verified")
+    isPhoneVerified   Boolean   @default(false) @map("is_phone_verified")
+    isActive          Boolean   @default(true) @map("is_active")
+    createdAt         DateTime  @default(now())
+    updatedAt         DateTime  @updatedAt
+    deletedAt         DateTime?
+    roleId            String?   @map("role_id")
+    emailVerification EmailVerification?
+    passwordResets    PasswordReset[]
+    sessions          UserSession[]
+    role              Role?     @relation(fields: [roleId], references: [id])
 
-  emailVerification EmailVerification?
-
-  @@map("users")
+    @@map("users")
 }
 
 model UserSession {
@@ -42,34 +44,73 @@ model UserSession {
   @@index([userId])
   @@index([expiresAt])
   @@index([revokedAt])
-
   @@map("user_sessions")
 }
 
 model EmailVerification {
-  id         String   @id @default(uuid())
-  token      String   @unique
+  id         String    @id @default(uuid())
+  token      String    @unique
   expiresAt  DateTime
   verifiedAt DateTime?
-  createdAt  DateTime @default(now())
-  userId     String   @unique
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+  userId     String    @unique
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("email_verifications")
 }
 
 model PasswordReset {
-  id         String    @id @default(uuid())
-  userId     String
-  token      String    @unique
-  expiresAt  DateTime
-  usedAt     DateTime?
-  createdAt  DateTime  @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String    @id @default(uuid())
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([token])
   @@map("password_resets")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  users       User[]
+
+  rolePermissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(uuid())
+  resource    String
+  action      String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  rolePermissions RolePermission[]
+
+  @@unique([resource, action])
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           String   @id @default(uuid())
+  roleId       String
+  permissionId String
+  createdAt    DateTime @default(now())
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
+  @@map("role_permissions")
 }
