@@ -13,7 +13,7 @@ import type { Response } from 'express';
 
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(private readonly usersService: UsersService) { }
 
   @UseGuards(PermissionsGuard)
   @Permissions('users', 'create')
@@ -26,12 +26,14 @@ export class UsersController {
   @Permissions('users', 'view')
   @Get()
   findAll(@Query() query: UsersQueryDto) {
-      return this.usersService.findAll(query);
+    return this.usersService.findAll(query);
   }
 
+  @UseGuards(PermissionsGuard)
+  @Permissions('users', 'view')
   @Get('table-config')
   getTableConfig() {
-      return usersTableConfig;
+    return usersTableConfig;
   }
 
   @UseGuards(PermissionsGuard)
@@ -41,8 +43,8 @@ export class UsersController {
     const buffer = await this.usersService.exportUsers(query);
 
     response.set({
-        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': 'attachment; filename="users.xlsx"',
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': 'attachment; filename="users.xlsx"',
     });
 
     response.end(buffer);

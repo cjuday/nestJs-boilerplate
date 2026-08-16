@@ -10,6 +10,7 @@ import { EmailVerificationModule } from './email-verification/email-verification
 import { MailModule } from './mail/mail.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { PasswordResetModule } from './password-reset/password-reset.module';
+import { RolesModule } from './roles/roles.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { PasswordResetModule } from './password-reset/password-reset.module';
     MailModule,
     RealtimeModule,
     PasswordResetModule,
+    RolesModule,
   ],
   providers: [
     {

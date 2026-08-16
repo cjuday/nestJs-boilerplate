@@ -15,6 +15,7 @@ import { MailService } from 'src/mail/mail.service';
 import { PasswordResetService } from 'src/password-reset/password-reset.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { UserResponseDto } from './dto/responses/user-response.dto';
 
 @Injectable()
 export class AuthService {
@@ -26,8 +27,39 @@ export class AuthService {
     private readonly emailVerificationService: EmailVerificationService,
     private readonly passwordResetService: PasswordResetService,
     private readonly prisma: PrismaService
-  ) {}
+  ) { }
 
+  private mapAuthUser(user: Awaited<ReturnType<UsersService['findAuthUserById']>>, emailVerificationExpiresAt: Date | null): UserResponseDto {
+    if (!user) {
+      throw new UnauthorizedException('Invalid user!');
+    }
+
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phoneNumber: user.phoneNumber,
+      isEmailVerified: user.isEmailVerified,
+      emailVerificationExpiresAt,
+
+      role: user.role
+        ? {
+          id: user.role.id,
+          name: user.role.name,
+        }
+        : null,
+
+      permissions:
+        user.role?.rolePermissions.map(
+          ({ permission }) => ({
+            resource: permission.resource,
+            action: permission.action,
+          }),
+        ) ?? [],
+    };
+  }
+
+  //Registration method
   async register(registerDto: RegisterDto): Promise<LoginResult> {
     const existingUser = await this.userService.findByEmail(registerDto.email);
 
@@ -37,7 +69,7 @@ export class AuthService {
 
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);
 
-    const user = await this.userService.create({...registerDto, password: hashedPassword });
+    const user = await this.userService.create({ ...registerDto, password: hashedPassword });
 
     const verificationToken = await this.emailVerificationService.create(user.id);
 
@@ -47,39 +79,27 @@ export class AuthService {
 
     const rememberMe = false;
 
-    const refreshExpiresIn =
-      this.tokenService.getRefreshExpiresIn(rememberMe);
+    const refreshExpiresIn = this.tokenService.getRefreshExpiresIn(rememberMe);
 
-    const tokens = await this.tokenService.generateTokens(
-      user,
-      jti,
-      refreshExpiresIn,
-    );
+    const tokens = await this.tokenService.generateTokens(user, jti, refreshExpiresIn);
 
     const expiresAt = this.tokenService.calculateExpiresAt(refreshExpiresIn);
 
-    await this.sessionsService.create({
-      userId: user.id,
-      jti,
-      refreshToken: tokens.refreshToken,
-      expiresAt,
-      rememberMe,
-    });
+    await this.sessionsService.create({ userId: user.id, jti, refreshToken: tokens.refreshToken, expiresAt, rememberMe });
+
+    const authUser = await this.userService.findAuthUserById(user.id);
 
     return {
       ...tokens,
       rememberMe,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        phoneNumber: user.phoneNumber,
-        isEmailVerified: user.isEmailVerified,
-        emailVerificationExpiresAt: verificationToken.expiresAt,
-      },
+      user: this.mapAuthUser(
+        authUser,
+        verificationToken.expiresAt,
+      ),
     };
   }
 
+  //Login method
   async login(loginDto: LoginDto): Promise<LoginResult> {
     const jti = randomUUID();
 
@@ -93,10 +113,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid Credentials!');
     }
 
-    const passwordMatch = await bcrypt.compare(
-      loginDto.password,
-      user.password,
-    );
+    const passwordMatch = await bcrypt.compare(loginDto.password, user.password);
 
     if (!passwordMatch) {
       throw new UnauthorizedException('Invalid Credentials');
@@ -104,40 +121,26 @@ export class AuthService {
 
     const expiresAt = this.tokenService.calculateExpiresAt(refreshExpiresIn);
 
-    const tokens = await this.tokenService.generateTokens(
-      user,
-      jti,
-      refreshExpiresIn,
-    );
+    const tokens = await this.tokenService.generateTokens(user, jti, refreshExpiresIn);
 
-    await this.sessionsService.create({
-      userId: user.id,
-      jti,
-      refreshToken: tokens.refreshToken,
-      expiresAt,
-      rememberMe: rememberMe,
-    });
+    await this.sessionsService.create({ userId: user.id, jti, refreshToken: tokens.refreshToken, expiresAt, rememberMe: rememberMe });
 
     const verification = await this.emailVerificationService.findLatestUnverified(user.id);
+
+    const authUser = await this.userService.findAuthUserById(user.id);
 
     return {
       ...tokens,
       rememberMe,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        phoneNumber: user.phoneNumber,
-        isEmailVerified: user.isEmailVerified,
-        emailVerificationExpiresAt: verification?.expiresAt ?? null,
-      },
+      user: this.mapAuthUser(
+        authUser,
+        verification?.expiresAt ?? null,
+      ),
     };
   }
 
-  async logout(
-    payload: RefreshTokenPayload,
-    refreshToken: string,
-  ): Promise<void> {
+  //Logout method
+  async logout(payload: RefreshTokenPayload, refreshToken: string): Promise<void> {
     const session = await this.sessionsService.findByJti(payload.jti);
 
     if (!session) {
@@ -152,10 +155,7 @@ export class AuthService {
       return;
     }
 
-    const valid = await bcrypt.compare(
-      refreshToken,
-      session.hashedRefreshToken,
-    );
+    const valid = await bcrypt.compare(refreshToken, session.hashedRefreshToken);
 
     if (!valid) {
       throw new UnauthorizedException('Invalid refresh token!');
@@ -164,10 +164,8 @@ export class AuthService {
     await this.sessionsService.revoke(session.id);
   }
 
-  async refresh(
-    payload: RefreshTokenPayload,
-    refreshToken: string,
-  ): Promise<RefreshAuthResult> {
+  //Refresh method
+  async refresh(payload: RefreshTokenPayload, refreshToken: string): Promise<RefreshAuthResult> {
     const session = await this.sessionsService.findByJti(payload.jti);
 
     if (!session) {
@@ -182,16 +180,13 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token expired!');
     }
 
-    const valid = await bcrypt.compare(
-      refreshToken,
-      session.hashedRefreshToken,
-    );
+    const valid = await bcrypt.compare(refreshToken, session.hashedRefreshToken);
 
     if (!valid) {
       throw new UnauthorizedException('Invalid refresh token!');
     }
 
-    const user = await this.userService.findById(payload.sub);
+    const user = await this.userService.findAuthUserById(payload.sub);
 
     if (!user) {
       throw new UnauthorizedException('Invalid user!');
@@ -199,46 +194,33 @@ export class AuthService {
 
     const newJti = randomUUID();
 
-    const refreshExpiresIn = this.tokenService.getRefreshExpiresIn(
-      session.rememberMe,
-    );
+    const refreshExpiresIn = this.tokenService.getRefreshExpiresIn(session.rememberMe);
 
-    const tokens = await this.tokenService.generateTokens(
-      user,
-      newJti,
-      refreshExpiresIn,
-    );
+    const tokens = await this.tokenService.generateTokens(user, newJti, refreshExpiresIn);
 
     const expiresAt = this.tokenService.calculateExpiresAt(refreshExpiresIn);
 
-    await this.sessionsService.updateRefreshToken({
-      sessionId: session.id,
-      refreshToken: tokens.refreshToken,
-      jti: newJti,
-      expiresAt,
-    });
-    
+    await this.sessionsService.updateRefreshToken({ sessionId: session.id, refreshToken: tokens.refreshToken, jti: newJti, expiresAt });
+
     const verification = await this.emailVerificationService.findLatestUnverified(user.id);
 
     return {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
       rememberMe: session.rememberMe,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        phoneNumber: user.phoneNumber,
-        isEmailVerified: user.isEmailVerified,
-        emailVerificationExpiresAt: verification?.expiresAt ?? null,
-      },
+      user: this.mapAuthUser(
+        user,
+        verification?.expiresAt ?? null,
+      ),
     };
   }
 
+  //Logout from all device method
   async logoutAll(user: JwtPayload): Promise<void> {
     await this.sessionsService.revokeAllForUser(user.sub);
   }
 
+  //Resened verification email method
   async resendEmailVerification(userId: string) {
     const user = await this.userService.findById(userId);
 
@@ -253,19 +235,20 @@ export class AuthService {
     const verification = await this.emailVerificationService.create(user.id);
 
     try {
-        await this.mailService.sendVerificationEmail(user.email, user.name, verification.token);
+      await this.mailService.sendVerificationEmail(user.email, user.name, verification.token);
     } catch (error) {
-        await this.emailVerificationService.delete(user.id);
-        throw error;
+      await this.emailVerificationService.delete(user.id);
+      throw error;
     }
 
     return verification;
   }
 
+  //Forgot password method
   async forgotPassword(email: string): Promise<void> {
     const user = await this.userService.findByEmail(email);
 
-    if(!user) {
+    if (!user) {
       return;
     }
 
@@ -274,13 +257,14 @@ export class AuthService {
     await this.mailService.sendPasswordResetEmail(user.email, user.name, reset.token);
   }
 
-  async resetPassword(token: string, password: string) : Promise<void> {
+  //Reset password method
+  async resetPassword(token: string, password: string): Promise<void> {
     const reset = await this.passwordResetService.verifyToken(token);
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
     await this.prisma.$transaction([
-      this.prisma.user.update({ 
+      this.prisma.user.update({
         where: {
           id: reset.userId
         },
@@ -300,6 +284,7 @@ export class AuthService {
     ]);
   }
 
+  //Change password method
   async changePassword(userId: string, dto: ChangePasswordDto) {
     const user = await this.prisma.user.findUnique({
       where: {

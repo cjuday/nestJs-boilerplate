@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -7,13 +7,63 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UsersQueryDto } from './dto/users-query.dto';
 import { usersTableConfig } from './users.table';
 import ExcelJS from 'exceljs';
+import bcrypt from 'bcrypt';
 
 const profileSelect = {
     id: true,
     name: true,
     email: true,
     phoneNumber: true,
+    role: {
+        select: {
+            id: true,
+            name: true,
+        },
+    },
     isEmailVerified: true,
+    emailVerification: {
+        select: {
+            verifiedAt: true,
+        },
+    },
+    isActive: true,
+    createdAt: true,
+    updatedAt: true,
+} satisfies Prisma.UserSelect;
+
+const authProfileSelect = {
+    id: true,
+    name: true,
+    email: true,
+    phoneNumber: true,
+
+    role: {
+        select: {
+            id: true,
+            name: true,
+
+            rolePermissions: {
+                select: {
+                    permission: {
+                        select: {
+                            resource: true,
+                            action: true,
+                        },
+                    },
+                },
+            },
+        },
+    },
+
+    isEmailVerified: true,
+
+    emailVerification: {
+        select: {
+            verifiedAt: true,
+        },
+    },
+
+    isActive: true,
     createdAt: true,
     updatedAt: true,
 } satisfies Prisma.UserSelect;
@@ -145,30 +195,7 @@ export class UsersService {
                 skip,
                 take: limit,
                 orderBy,
-                select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                    phoneNumber: true,
-
-                    role: {
-                        select: {
-                            id: true,
-                            name: true,
-                        },
-                    },
-
-                    isEmailVerified: true,
-
-                    emailVerification: {
-                        select: {
-                            verifiedAt: true,
-                        },
-                    },
-
-                    isActive: true,
-                    createdAt: true,
-                },
+                select: profileSelect
             }),
 
             this.prisma.user.count({
@@ -227,6 +254,8 @@ export class UsersService {
     }
 
     async update(id: string, updateUserDto: UpdateUserDto) {
+        const { name, phoneNumber, roleId, isActive, password, confirmPassword } = updateUserDto;
+
         const user = await this.prisma.user.findUnique({
             where: {
                 id,
@@ -238,16 +267,36 @@ export class UsersService {
             throw new NotFoundException('User not found.');
         }
 
-        const updatedUser = await this.prisma.user.update({
-            where: {
-                id,
+        if (password && password !== confirmPassword) {
+            throw new BadRequestException('Passwords do not match.');
+        }
+
+        const data: Prisma.UserUpdateInput = {
+            name,
+            phoneNumber,
+            isActive,
+            role: {
+                connect: {
+                    id: roleId,
+                },
             },
-            data: {
-                name: updateUserDto.name,
-                phoneNumber: updateUserDto.phoneNumber,
-            },
-            select: profileSelect,
-        });
+        };
+
+        if (password) {
+            data.password = await bcrypt.hash(
+                password,
+                12,
+            );
+        }
+
+        const updatedUser =
+            await this.prisma.user.update({
+                where: {
+                    id,
+                },
+                data,
+                select: profileSelect,
+            });
 
         return {
             message: 'User updated successfully.',
@@ -293,16 +342,22 @@ export class UsersService {
     async getProfile(userId: string) {
         const profile = await this.prisma.user.findUnique({
             where: {
-                id: userId
+                id: userId,
             },
-            select: profileSelect
+            select: authProfileSelect,
         });
 
         if (!profile) {
             throw new UnauthorizedException('Unauthorized.');
         }
 
-        return profile;
+        return {
+            ...profile,
+            permissions:
+                profile.role?.rolePermissions.map(
+                    ({ permission }) => permission,
+                ) ?? [],
+        };
     }
 
     async updateProfile(userId: string, dto: UpdateProfileDto) {
@@ -434,29 +489,7 @@ export class UsersService {
         const users = await this.prisma.user.findMany({
             where,
             orderBy,
-            select: {
-                name: true,
-                email: true,
-                phoneNumber: true,
-
-                role: {
-                    select: {
-                        id: true,
-                        name: true,
-                    },
-                },
-
-                isEmailVerified: true,
-
-                emailVerification: {
-                    select: {
-                        verifiedAt: true,
-                    },
-                },
-
-                isActive: true,
-                createdAt: true,
-            },
+            select: profileSelect
         });
 
         const workbook = new ExcelJS.Workbook();
@@ -544,9 +577,7 @@ export class UsersService {
         return workbook.xlsx.writeBuffer();
     }
 
-    private getExportColumnWidth(
-        key: string,
-    ): number {
+    private getExportColumnWidth(key: string): number {
         const widths: Record<string, number> = {
             name: 25,
             email: 32,
@@ -559,5 +590,39 @@ export class UsersService {
         };
 
         return widths[key] ?? 20;
+    }
+
+    async findAuthUserById(id: string) {
+        return this.prisma.user.findUnique({
+            where: {
+                id,
+                deletedAt: null,
+            },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                phoneNumber: true,
+                isEmailVerified: true,
+
+                role: {
+                    select: {
+                        id: true,
+                        name: true,
+
+                        rolePermissions: {
+                            select: {
+                                permission: {
+                                    select: {
+                                        resource: true,
+                                        action: true,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        });
     }
 }
